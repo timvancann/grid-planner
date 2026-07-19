@@ -3,6 +3,7 @@
   import { activeWorldBounds } from "../core/paint";
   import type { Bounds } from "../core/types";
   import { fitBounds, unionBounds, zoomAt } from "../core/viewport";
+  import { history, redoNow, undoNow } from "../state/history.svelte";
   import { plan, ui } from "../state/plan.svelte";
 
   function zoomBy(factor: number) {
@@ -58,6 +59,23 @@
     Mounts
   </button>
   <span class="sep"></span>
+  <button
+    class="btn"
+    disabled={!history.canUndo}
+    title="undo (⌘Z)"
+    onclick={() => void undoNow()}
+  >
+    ↺
+  </button>
+  <button
+    class="btn"
+    disabled={!history.canRedo}
+    title="redo (⇧⌘Z)"
+    onclick={() => void redoNow()}
+  >
+    ↻
+  </button>
+  <span class="sep"></span>
   <button class="btn" onclick={() => zoomBy(1.25)}>+</button>
   <button class="btn" onclick={() => zoomBy(0.8)}>−</button>
   <button class="btn" onclick={fitToContent}>fit</button>
@@ -78,5 +96,10 @@
     width: 1px;
     height: 18px;
     background: var(--panel-border);
+  }
+
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: default;
   }
 </style>

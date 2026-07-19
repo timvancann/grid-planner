@@ -1,18 +1,21 @@
 <script lang="ts">
-  import { cellAt, cellKeyAt, gridLines, parseCellKey } from "../core/grid";
+  import { cellAt, cellKey, cellKeyAt, gridLines, parseCellKey } from "../core/grid";
   import { allOccupancy, footprintRange, toolOverlaps } from "../core/occupancy";
   import { segmentActive } from "../core/segment";
   import type { Point } from "../core/types";
   import { toWorld, visibleBounds, zoomAt } from "../core/viewport";
+  import { history } from "../state/history.svelte";
   import { plan, ui } from "../state/plan.svelte";
 
   let wrap = $state<HTMLDivElement>();
   let svg = $state<SVGSVGElement>();
   const size = $derived(ui.canvasSize);
 
+  type PaintLayer = "active" | "mount";
   type Drag =
     | { type: "pan"; sx: number; sy: number; ox: number; oy: number }
-    | { type: "paint"; layer: "active" | "mount"; value: boolean; last: string }
+    | { type: "paint"; layer: PaintLayer; value: boolean; last: string }
+    | { type: "rect"; layer: PaintLayer; value: boolean; a: Point; b: Point } // cell indices
     | {
         type: "obj";
         kind: "image" | "surface" | "tool";
@@ -21,6 +24,7 @@
         orig: Point;
       };
   let drag: Drag | null = null;
+  let rectPreview = $state<{ i0: number; j0: number; i1: number; j1: number; value: boolean } | null>(null);
   const ptrs = new Map<number, Point>();
 
   $effect(() => {
@@ -108,7 +112,9 @@
     capture(e);
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (ptrs.size === 2) {
-      drag = null; // second finger down: any pan/paint/drag becomes a pinch
+      endStroke(); // second finger down: any pan/paint/drag becomes a pinch
+      drag = null;
+      rectPreview = null;
       return;
     }
     const w = worldAt(e);
@@ -136,11 +142,19 @@
       return;
     }
     if (ui.mode === "paint" || ui.mode === "mount") {
-      const layer = ui.mode === "mount" ? "mount" : "active";
+      const layer: PaintLayer = ui.mode === "mount" ? "mount" : "active";
       const key = cellKeyAt(w.x, w.y, plan.pitch);
       const value = layer === "mount" ? !plan.mounts.has(key) : !plan.active.has(key);
-      drag = { type: "paint", layer, value, last: key };
-      paintCell(layer, key, value);
+      history.beginStroke(plan.toPlan());
+      if (e.shiftKey) {
+        const c = cellAt(w.x, w.y, plan.pitch);
+        const p = { x: c.i, y: c.j };
+        drag = { type: "rect", layer, value, a: p, b: p };
+        updateRectPreview();
+      } else {
+        drag = { type: "paint", layer, value, last: key };
+        paintCell(layer, key, value);
+      }
       return;
     }
     drag = { type: "pan", sx: e.clientX, sy: e.clientY, ox: ui.view.ox, oy: ui.view.oy };
@@ -155,6 +169,7 @@
     e.stopPropagation();
     capture(e);
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    history.beginStroke(plan.toPlan());
     drag = {
       type: "obj",
       kind,
@@ -162,6 +177,31 @@
       start: worldAt(e),
       orig: { x: obj.x, y: obj.y },
     };
+  }
+
+  function updateRectPreview() {
+    if (drag?.type !== "rect") return;
+    rectPreview = {
+      i0: Math.min(drag.a.x, drag.b.x),
+      j0: Math.min(drag.a.y, drag.b.y),
+      i1: Math.max(drag.a.x, drag.b.x),
+      j1: Math.max(drag.a.y, drag.b.y),
+      value: drag.value,
+    };
+  }
+
+  function applyRect() {
+    if (drag?.type !== "rect" || !rectPreview) return;
+    const { i0, j0, i1, j1 } = rectPreview;
+    for (let i = i0; i <= i1; i++) {
+      for (let j = j0; j <= j1; j++) {
+        paintCell(drag.layer, cellKey(i, j), drag.value);
+      }
+    }
+  }
+
+  function endStroke() {
+    if (drag && drag.type !== "pan") history.endStroke(plan.toPlan());
   }
 
   function onPointerMove(e: PointerEvent) {
@@ -210,6 +250,12 @@
       }
       return;
     }
+    if (drag.type === "rect") {
+      const c = cellAt(w.x, w.y, plan.pitch);
+      drag.b = { x: c.i, y: c.j };
+      updateRectPreview();
+      return;
+    }
     let nx = drag.orig.x + (w.x - drag.start.x);
     let ny = drag.orig.y + (w.y - drag.start.y);
     if (drag.kind !== "image") {
@@ -231,7 +277,12 @@
 
   function onPointerUp(e: PointerEvent) {
     ptrs.delete(e.pointerId);
-    if (ptrs.size === 0) drag = null;
+    if (ptrs.size === 0) {
+      if (drag?.type === "rect") applyRect();
+      endStroke();
+      drag = null;
+      rectPreview = null;
+    }
   }
 
   const cursor = $derived(ui.mode === "move" ? "grab" : "crosshair");
@@ -242,7 +293,9 @@
     {#if snapEditTool}
       click cells under "{snapEditTool.name}" to toggle multiconnect snaps
     {:else if ui.mode === "mount"}
-      click cells to toggle mounting hardware (adhesive, screws)
+      click cells to toggle mounting hardware (adhesive, screws), shift-drag for a rectangle
+    {:else if ui.mode === "paint"}
+      drag to paint cells, shift-drag for a rectangle
     {:else}
       {ui.view.ppm.toFixed(2)} px/mm, pitch {plan.pitch} mm
       {#if !dimming}, paint cells to define the printed area{/if}
@@ -525,6 +578,22 @@
           {/if}
         </g>
       {/each}
+
+      <!-- rectangle-paint preview -->
+      {#if rectPreview}
+        <rect
+          x={rectPreview.i0 * plan.pitch}
+          y={rectPreview.j0 * plan.pitch}
+          width={(rectPreview.i1 - rectPreview.i0 + 1) * plan.pitch}
+          height={(rectPreview.j1 - rectPreview.j0 + 1) * plan.pitch}
+          fill={rectPreview.value ? "var(--accent)" : "var(--danger)"}
+          fill-opacity="0.15"
+          stroke={rectPreview.value ? "var(--accent)" : "var(--danger)"}
+          stroke-width={1.5 * px}
+          stroke-dasharray="{5 * px} {4 * px}"
+          pointer-events="none"
+        />
+      {/if}
 
       <!-- tool body overlaps -->
       {#each overlaps as o (`${o.aId}-${o.bId}`)}

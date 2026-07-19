@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { footprintRange } from "../../core/occupancy";
   import { visibleBounds } from "../../core/viewport";
   import { plan, ui } from "../../state/plan.svelte";
   import Section from "./Section.svelte";
@@ -9,6 +10,8 @@
 
   let editingId = $state<string | null>(null);
   let editName = $state("");
+  let editW = $state(0);
+  let editH = $state(0);
 
   function add() {
     if (!(w > 0 && h > 0)) return;
@@ -22,18 +25,41 @@
     plan.addTool(name, w, h, x, y);
   }
 
-  function startRename(id: string, current: string) {
-    editingId = id;
-    editName = current;
+  function startEdit(t: { id: string; name: string; w: number; h: number }) {
+    editingId = t.id;
+    editName = t.name;
+    editW = t.w;
+    editH = t.h;
   }
 
-  function commitRename() {
+  function commitEdit() {
     const id = editingId;
     if (id !== null) {
-      const next = editName.trim();
-      if (next) plan.tools = plan.tools.map((t) => (t.id === id ? { ...t, name: next } : t));
+      plan.tools = plan.tools.map((t) => {
+        if (t.id !== id) return t;
+        const name = editName.trim() || t.name;
+        const nw = editW > 0 ? editW : t.w;
+        const nh = editH > 0 ? editH : t.h;
+        // drop snap offsets that fall outside the resized footprint
+        const fp = footprintRange({ ...t, w: nw, h: nh }, plan.pitch);
+        const cols = fp.i1 - fp.i0 + 1;
+        const rows = fp.j1 - fp.j0 + 1;
+        const snaps = t.snaps?.filter((s) => s.di < cols && s.dj < rows);
+        return {
+          ...t,
+          name,
+          w: nw,
+          h: nh,
+          snaps: snaps && snaps.length > 0 ? snaps : undefined,
+        };
+      });
     }
     editingId = null;
+  }
+
+  function editKeys(e: KeyboardEvent) {
+    if (e.key === "Enter") commitEdit();
+    if (e.key === "Escape") editingId = null;
   }
 </script>
 
@@ -49,24 +75,29 @@
   {#each plan.tools as t (t.id)}
     <div class="item">
       {#if editingId === t.id}
-        <!-- svelte-ignore a11y_autofocus -->
-        <input
-          class="input"
-          type="text"
-          autofocus
-          bind:value={editName}
-          onblur={commitRename}
-          onkeydown={(e) => {
-            if (e.key === "Enter") commitRename();
-            if (e.key === "Escape") editingId = null;
-          }}
-        />
+        <div class="editor">
+          <!-- svelte-ignore a11y_autofocus -->
+          <input
+            class="input"
+            type="text"
+            placeholder="name"
+            autofocus
+            bind:value={editName}
+            onkeydown={editKeys}
+          />
+          <div class="dims">
+            <input class="input" type="number" title="width (mm)" bind:value={editW} onkeydown={editKeys} />
+            <span class="x">×</span>
+            <input class="input" type="number" title="height (mm)" bind:value={editH} onkeydown={editKeys} />
+            <button class="btn" onclick={commitEdit}>✓</button>
+          </div>
+        </div>
       {:else}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <span
           class="tool-label"
-          title="double-click to rename"
-          ondblclick={() => startRename(t.id, t.name)}
+          title="double-click to edit name and size"
+          ondblclick={() => startEdit(t)}
         >
           <span style:color={t.color}>▪</span>
           {t.name} {t.w}×{t.h} mm
@@ -127,6 +158,19 @@
 
   .tool-label {
     cursor: text;
+  }
+
+  .editor {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .dims {
+    display: flex;
+    gap: 4px;
+    align-items: center;
   }
 
   .del {

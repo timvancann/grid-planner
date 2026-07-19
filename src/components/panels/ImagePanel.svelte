@@ -2,7 +2,7 @@
   import { calibrateImage } from "../../core/calibrate";
   import { processImageFile } from "../../lib/image";
   import { plan, ui } from "../../state/plan.svelte";
-  import { deleteImageBlob, saveImageBlob } from "../../state/persist";
+  import { saveImageBlob } from "../../state/persist";
   import Row from "./Row.svelte";
   import Section from "./Section.svelte";
 
@@ -41,7 +41,8 @@
     ui.setImageUrl(null);
     ui.calib = null;
     if (ui.mode === "calibrate") ui.mode = "move";
-    void deleteImageBlob();
+    // the blob stays in IndexedDB so undo can restore the image; it is
+    // cleared on reset or overwritten by the next upload
   }
 </script>
 

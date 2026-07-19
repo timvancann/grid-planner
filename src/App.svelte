@@ -2,6 +2,7 @@
   import Canvas from "./components/Canvas.svelte";
   import Sidebar from "./components/Sidebar.svelte";
   import Toolbar from "./components/Toolbar.svelte";
+  import { history, redoNow, undoNow } from "./state/history.svelte";
   import { plan, ui } from "./state/plan.svelte";
   import { debounce, loadPersisted, savePlan } from "./state/persist";
 
@@ -25,6 +26,25 @@
     const snapshot = plan.toPlan();
     if (!ui.loaded) return;
     save(snapshot);
+    history.onChange(snapshot);
+  });
+
+  $effect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const t = e.target as HTMLElement | null;
+      if (t && ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName)) return;
+      const k = e.key.toLowerCase();
+      if (k === "z") {
+        e.preventDefault();
+        void (e.shiftKey ? redoNow() : undoNow());
+      } else if (k === "y") {
+        e.preventDefault();
+        void redoNow();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   });
 </script>
 
