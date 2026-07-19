@@ -1,5 +1,7 @@
 # grid planner
 
+**Use it directly at [timvancann.github.io/grid-planner](https://timvancann.github.io/grid-planner/)**, no install needed. The app is fully client-side: your photos and plans are processed and stored in your own browser (IndexedDB) and never leave your machine.
+
 A client-only, mm-accurate planning tool for grid wall/surface systems such as [openGrid](https://www.printables.com/model/1214361-opengrid-wall-framework-ecosystem) and [Gridfinity](https://gridfinity.xyz/). Calibrate a photo of your surface against a real-world distance, paint which grid cells will be printed, mark mounting cells (adhesive, screws), and place tools to check cell occupancy, conflicts, and overlaps. Print segmentation splits the painted area into balanced, bed-sized tiles. No backend; state persists in the browser (IndexedDB).
 
 ## Develop
