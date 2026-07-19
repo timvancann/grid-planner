@@ -1,0 +1,68 @@
+:root {
+  --bg: #101318;
+  --panel: #171b21;
+  --panel-border: #232a33;
+  --input-bg: #0d1015;
+  --btn-bg: #1e242c;
+  --text: #d7dde3;
+  --dim: #8b95a1;
+  --accent: #f2a33c;
+  --accent-contrast: #14161a;
+  --danger: #e5484d;
+  --surface-fill: #2b333d;
+  --surface-stroke: #4a5666;
+  --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+}
+
+#app {
+  height: 100%;
+}
+
+/* shared form controls (kept global: identical across all panels) */
+.input {
+  background: var(--input-bg);
+  border: 1px solid var(--panel-border);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.btn {
+  background: var(--btn-bg);
+  color: var(--text);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-family: var(--mono);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn.active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+}
+
+.btn:hover:not(.active) {
+  border-color: var(--surface-stroke);
+}
