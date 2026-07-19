@@ -73,18 +73,17 @@
         onchange={(e) =>
           (plan.image = { ...im, rot: parseFloat(e.currentTarget.value) || 0 })}
       />
-      <span class="unit">°</span>
+      <input
+        class="slider"
+        type="range"
+        min="-180"
+        max="180"
+        step="0.1"
+        value={im.rot}
+        oninput={(e) =>
+          (plan.image = { ...im, rot: parseFloat(e.currentTarget.value) })}
+      />
     </Row>
-    <input
-      class="slider"
-      type="range"
-      min="-180"
-      max="180"
-      step="0.1"
-      value={im.rot}
-      oninput={(e) =>
-        (plan.image = { ...im, rot: parseFloat(e.currentTarget.value) })}
-    />
     <Row label="opacity">
       <input
         class="slider"
@@ -169,7 +168,8 @@
   }
 
   .slider {
-    width: 100%;
+    flex: 1;
+    min-width: 0;
   }
 
   .mono {

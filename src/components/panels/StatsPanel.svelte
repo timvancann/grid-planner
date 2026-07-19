@@ -9,6 +9,17 @@
   const bbox = $derived(activeCellBounds(plan.active));
   const conflicts = $derived(occ.filter((o) => o.conflict));
   const tiles = $derived(segmentActive(plan.active, plan.bed));
+  // aggregate tiles into a print shopping list, largest first
+  const printList = $derived.by(() => {
+    const m = new Map<string, { w: number; h: number; n: number }>();
+    for (const t of tiles) {
+      const k = `${t.w}×${t.h}`;
+      const e = m.get(k);
+      if (e) e.n++;
+      else m.set(k, { w: t.w, h: t.h, n: 1 });
+    }
+    return [...m.values()].sort((a, b) => b.w * b.h - a.w * a.h);
+  });
   const overlaps = $derived(toolOverlaps(plan.tools));
   const toolName = (id: string) => plan.tools.find((t) => t.id === id)?.name ?? "?";
 </script>
@@ -31,6 +42,9 @@
       {:else}
         <div>prints: {tiles.length} (bed {plan.bed.w} × {plan.bed.h})</div>
       {/if}
+      <div>
+        print list: {printList.map((e) => `${e.n}× ${e.w}×${e.h}`).join(", ")}
+      </div>
     {/if}
     {#each overlaps as o (`${o.aId}-${o.bId}`)}
       <div class="danger">⚠ {toolName(o.aId)} overlaps {toolName(o.bId)}</div>

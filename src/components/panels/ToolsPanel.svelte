@@ -61,6 +61,17 @@
     if (e.key === "Enter") commitEdit();
     if (e.key === "Escape") editingId = null;
   }
+
+  // 90 deg clockwise: w/h swap, snap cell (di, dj) -> (rows-1-dj, di)
+  function rotateTool(id: string) {
+    plan.tools = plan.tools.map((t) => {
+      if (t.id !== id) return t;
+      const fp = footprintRange(t, plan.pitch);
+      const rows = fp.j1 - fp.j0 + 1;
+      const snaps = t.snaps?.map((s) => ({ di: rows - 1 - s.dj, dj: s.di }));
+      return { ...t, w: t.h, h: t.w, ...(snaps ? { snaps } : {}) };
+    });
+  }
 </script>
 
 <Section title="Tools">
@@ -103,24 +114,29 @@
           {t.name} {t.w}×{t.h} mm
         </span>
       {/if}
-      <button
-        class="btn del"
-        class:active={ui.editSnapsToolId === t.id}
-        title="edit multiconnect snap cells on the canvas"
-        onclick={() =>
-          (ui.editSnapsToolId = ui.editSnapsToolId === t.id ? null : t.id)}
-      >
-        {ui.editSnapsToolId === t.id ? "done" : "snaps"}
-      </button>
-      <button
-        class="btn del"
-        onclick={() => {
-          if (ui.editSnapsToolId === t.id) ui.editSnapsToolId = null;
-          plan.tools = plan.tools.filter((x_) => x_.id !== t.id);
-        }}
-      >
-        ×
-      </button>
+      <div class="actions">
+        <button class="btn del" title="rotate 90°" onclick={() => rotateTool(t.id)}>
+          ⇄
+        </button>
+        <button
+          class="btn del"
+          class:active={ui.editSnapsToolId === t.id}
+          title="edit multiconnect snap cells on the canvas"
+          onclick={() =>
+            (ui.editSnapsToolId = ui.editSnapsToolId === t.id ? null : t.id)}
+        >
+          {ui.editSnapsToolId === t.id ? "done" : "snaps"}
+        </button>
+        <button
+          class="btn del"
+          onclick={() => {
+            if (ui.editSnapsToolId === t.id) ui.editSnapsToolId = null;
+            plan.tools = plan.tools.filter((x_) => x_.id !== t.id);
+          }}
+        >
+          ×
+        </button>
+      </div>
     </div>
   {/each}
 </Section>
@@ -148,12 +164,18 @@
 
   .item {
     display: flex;
-    justify-content: space-between;
     align-items: center;
     gap: 6px;
     font-size: 11px;
     font-family: var(--mono);
     margin-bottom: 4px;
+  }
+
+  .actions {
+    margin-left: auto;
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
   }
 
   .tool-label {
